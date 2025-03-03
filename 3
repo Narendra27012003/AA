@@ -1,0 +1,420 @@
+<!-- Container for the Stocks Management Page -->
+<div class="stock-management-container">
+  <!-- Tabs (currently only one tab, but expandable) -->
+  <ul class="tabs">
+    <li *ngFor="let tab of tabs" [class.active]="tab.value === selectedTab" (click)="selectTab(tab.value)">
+      {{ tab.label }}
+    </li>
+  </ul>
+
+  <!-- Top Controls: Search, Create Task, Filter, and Sort -->
+  <div class="top-controls">
+    <div class="search-container">
+      <input type="text" placeholder="Search..." [(ngModel)]="searchQuery" (input)="applySearchFilter()" />
+    </div>
+    <button class="create-btn" (click)="openEditModal()">Create New Task</button>
+    <div class="filter-sort-group">
+      <!-- Filter Popup Trigger -->
+      <button class="filter-btn" (click)="toggleFilterPopup = !toggleFilterPopup">Filter</button>
+      <div class="filter-popup" *ngIf="toggleFilterPopup">
+        <label for="filterColumn">Filter By Column:</label>
+        <select id="filterColumn" [(ngModel)]="filterColumn" (change)="applySearchFilter()">
+          <option value="customentName">Consumer</option>
+          <option value="product">Product</option>
+          <option value="supplier">Supplier</option>
+          <option value="cashier">Cashier</option>
+          <option value="status">Status</option>
+        </select>
+        <input type="text" placeholder="Enter filter text..." [(ngModel)]="filterText" />
+        <button (click)="applySearchFilter(); toggleFilterPopup = false;">Apply</button>
+      </div>
+      <!-- Sort Dropdowns -->
+      <label for="sortColumn">Sort By:</label>
+      <select id="sortColumn" [(ngModel)]="sortColumn" (change)="applySorting()">
+        <option value="customentName">Consumer</option>
+        <option value="product">Product</option>
+        <option value="supplier">Supplier</option>
+        <option value="dateOfEntry">Date of Entry</option>
+        <option value="status">Status</option>
+      </select>
+      <select [(ngModel)]="sortDirection" (change)="applySorting()">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Title for the Table -->
+  <h3>Overview Analysis</h3>
+
+  <!-- Table with Pinned First and Last Columns -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="sticky-left">Consumer</th>
+          <th>Product</th>
+          <th>Supplier</th>
+          <th>Date of Entry</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Selling Price</th>
+          <th>Cashier</th>
+          <th class="sticky-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of pagedData">
+          <td class="sticky-left">{{ item.customentName }}</td>
+          <td>{{ item.product }}</td>
+          <td>{{ item.supplier }}</td>
+          <td>{{ item.dateOfEntry ? (item.dateOfEntry | date:'dd MMM yyyy') : '—' }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>₹ {{ item.price }}</td>
+          <td>₹ {{ item.sellingPrice }}</td>
+          <td>{{ item.cashier }}</td>
+          <td class="sticky-right">
+            <span [ngClass]="['status-label', item.status]">{{ item.status }}</span>
+            <button class="edit-btn" (click)="openEditModal(item)">
+              <i class="fa fa-edit"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Controls -->
+  <div class="pagination">
+    <button (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">Prev</button>
+    <ng-container *ngFor="let page of [].constructor(totalPages); let i = index">
+      <button [class.active-page]="(i+1) === currentPage" (click)="goToPage(i+1)">{{ i+1 }}</button>
+    </ng-container>
+    <button (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">Next</button>
+    <span>
+      {{ (currentPage-1)*itemsPerPage + 1 }} -
+      {{
+        (currentPage*itemsPerPage) > filteredStockList.length
+          ? filteredStockList.length
+          : (currentPage*itemsPerPage)
+      }}
+      of {{ filteredStockList.length }}
+    </span>
+  </div>
+
+  <!-- Edit / Create Modal -->
+  <div class="modal-backdrop" *ngIf="showEditModal">
+    <div class="modal">
+      <h2 *ngIf="isEditMode">Edit Stock</h2>
+      <h2 *ngIf="!isEditMode">Create New Task/Stock</h2>
+
+      <div class="form-group">
+        <label>Consumer</label>
+        <input [(ngModel)]="editData.customentName" placeholder="Consumer Name" />
+      </div>
+      <div class="form-group">
+        <label>Product</label>
+        <input [(ngModel)]="editData.product" placeholder="Product" />
+      </div>
+      <div class="form-group">
+        <label>Supplier</label>
+        <input [(ngModel)]="editData.supplier" placeholder="Supplier" />
+      </div>
+      <div class="form-group">
+        <label>Date of Entry</label>
+        <input type="date" [(ngModel)]="editData.dateOfEntry" />
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" [(ngModel)]="editData.quantity" placeholder="Quantity" />
+      </div>
+      <div class="form-group">
+        <label>Price</label>
+        <input type="number" [(ngModel)]="editData.price" placeholder="Price" />
+      </div>
+      <div class="form-group">
+        <label>Selling Price</label>
+        <input type="number" [(ngModel)]="editData.sellingPrice" placeholder="Selling Price" />
+      </div>
+      <div class="form-group">
+        <label>Cashier</label>
+        <input [(ngModel)]="editData.cashier" placeholder="Cashier Name" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select [(ngModel)]="editData.status">
+          <option value="completed">completed</option>
+          <option value="closed">closed</option>
+          <option value="failed">failed</option>
+          <option value="pending">pending</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button (click)="closeModal()">Cancel</button>
+        <button (click)="saveData()">{{ isEditMode ? 'Save' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+4
+
+
+
+
+/* Container styles */
+.stock-management-container {
+  padding: 16px;
+  font-family: 'Roboto', sans-serif;
+  color: #333;
+}
+
+/* Tabs styles */
+.tabs {
+  list-style: none;
+  display: flex;
+  gap: 24px;
+  margin: 0 0 16px 0;
+  padding: 0;
+  border-bottom: 1px solid #ccc;
+}
+.tabs li {
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #555;
+  font-weight: 500;
+  border-radius: 4px 4px 0 0;
+}
+.tabs li.active {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  color: #3f51b5;
+}
+
+/* Top Controls styles */
+.top-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.search-container input {
+  width: 200px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+}
+.create-btn {
+  background-color: #3f51b5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.create-btn:hover {
+  background-color: #2c3992;
+}
+.filter-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-btn {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Filter Popup styles */
+.filter-popup {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 12px;
+  border-radius: 4px;
+  z-index: 999;
+}
+.filter-popup label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.filter-popup select,
+.filter-popup input {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.filter-popup button {
+  background-color: #3f51b5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+/* Table styles */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+th,
+td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+}
+/* Sticky Columns */
+.sticky-left {
+  position: sticky;
+  left: 0;
+  background-color: #fff;
+  z-index: 2;
+}
+.sticky-right {
+  position: sticky;
+  right: 0;
+  background-color: #fff;
+  z-index: 2;
+}
+/* Status Label styles */
+.status-label {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+  margin-right: 8px;
+}
+.status-label.completed {
+  background-color: #e5f7e9;
+  color: #34a853;
+}
+.status-label.closed {
+  background-color: #ececec;
+  color: #666;
+}
+.status-label.failed {
+  background-color: #fdeceb;
+  color: #d93025;
+}
+.status-label.pending {
+  background-color: #fff5e6;
+  color: #f49b22;
+}
+.edit-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #3f51b5;
+  font-size: 1rem;
+}
+
+/* Pagination styles */
+.pagination {
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pagination button {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.active-page {
+  background-color: #3f51b5;
+  color: #fff;
+}
+
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+.modal {
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+}
+.modal h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.form-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.form-group label {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.form-group input,
+.form-group select {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+.modal-actions button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+.modal-actions button:first-child {
+  background-color: #ccc;
+  color: #333;
+}
+.modal-actions button:last-child {
+  background-color: #3f51b5;
+  color: #fff;
+}
