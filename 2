@@ -1,0 +1,161 @@
+
+
+
+<!-- Container for the Stocks Management Page -->
+<div class="stock-management-container">
+  <!-- Tabs (currently only one tab, but expandable) -->
+  <ul class="tabs">
+    <li *ngFor="let tab of tabs" [class.active]="tab.value === selectedTab" (click)="selectTab(tab.value)">
+      {{ tab.label }}
+    </li>
+  </ul>
+
+  <!-- Top Controls: Search, Create Task, Filter, and Sort -->
+  <div class="top-controls">
+    <div class="search-container">
+      <input type="text" placeholder="Search..." [(ngModel)]="searchQuery" (input)="applySearchFilter()" />
+    </div>
+    <button class="create-btn" (click)="openEditModal()">Create New Task</button>
+    <div class="filter-sort-group">
+      <!-- Filter Popup Trigger -->
+      <button class="filter-btn" (click)="toggleFilterPopup = !toggleFilterPopup">Filter</button>
+      <div class="filter-popup" *ngIf="toggleFilterPopup">
+        <label for="filterColumn">Filter By Column:</label>
+        <select id="filterColumn" [(ngModel)]="filterColumn" (change)="applySearchFilter()">
+          <option value="customentName">Consumer</option>
+          <option value="product">Product</option>
+          <option value="supplier">Supplier</option>
+          <option value="cashier">Cashier</option>
+          <option value="status">Status</option>
+        </select>
+        <input type="text" placeholder="Enter filter text..." [(ngModel)]="filterText" />
+        <button (click)="applySearchFilter(); toggleFilterPopup = false;">Apply</button>
+      </div>
+      <!-- Sort Dropdowns -->
+      <label for="sortColumn">Sort By:</label>
+      <select id="sortColumn" [(ngModel)]="sortColumn" (change)="applySorting()">
+        <option value="customentName">Consumer</option>
+        <option value="product">Product</option>
+        <option value="supplier">Supplier</option>
+        <option value="dateOfEntry">Date of Entry</option>
+        <option value="status">Status</option>
+      </select>
+      <select [(ngModel)]="sortDirection" (change)="applySorting()">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Title for the Table -->
+  <h3>Overview Analysis</h3>
+
+  <!-- Table with Pinned First and Last Columns -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="sticky-left">Consumer</th>
+          <th>Product</th>
+          <th>Supplier</th>
+          <th>Date of Entry</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Selling Price</th>
+          <th>Cashier</th>
+          <th class="sticky-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of pagedData">
+          <td class="sticky-left">{{ item.customentName }}</td>
+          <td>{{ item.product }}</td>
+          <td>{{ item.supplier }}</td>
+          <td>{{ item.dateOfEntry ? (item.dateOfEntry | date:'dd MMM yyyy') : '—' }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>₹ {{ item.price }}</td>
+          <td>₹ {{ item.sellingPrice }}</td>
+          <td>{{ item.cashier }}</td>
+          <td class="sticky-right">
+            <span [ngClass]="['status-label', item.status]">{{ item.status }}</span>
+            <button class="edit-btn" (click)="openEditModal(item)">
+              <i class="fa fa-edit"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Controls -->
+  <div class="pagination">
+    <button (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">Prev</button>
+    <ng-container *ngFor="let page of [].constructor(totalPages); let i = index">
+      <button [class.active-page]="(i+1) === currentPage" (click)="goToPage(i+1)">{{ i+1 }}</button>
+    </ng-container>
+    <button (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">Next</button>
+    <span>
+      {{ (currentPage-1)*itemsPerPage + 1 }} -
+      {{
+        (currentPage*itemsPerPage) > filteredStockList.length
+          ? filteredStockList.length
+          : (currentPage*itemsPerPage)
+      }}
+      of {{ filteredStockList.length }}
+    </span>
+  </div>
+
+  <!-- Edit / Create Modal -->
+  <div class="modal-backdrop" *ngIf="showEditModal">
+    <div class="modal">
+      <h2 *ngIf="isEditMode">Edit Stock</h2>
+      <h2 *ngIf="!isEditMode">Create New Task/Stock</h2>
+
+      <div class="form-group">
+        <label>Consumer</label>
+        <input [(ngModel)]="editData.customentName" placeholder="Consumer Name" />
+      </div>
+      <div class="form-group">
+        <label>Product</label>
+        <input [(ngModel)]="editData.product" placeholder="Product" />
+      </div>
+      <div class="form-group">
+        <label>Supplier</label>
+        <input [(ngModel)]="editData.supplier" placeholder="Supplier" />
+      </div>
+      <div class="form-group">
+        <label>Date of Entry</label>
+        <input type="date" [(ngModel)]="editData.dateOfEntry" />
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" [(ngModel)]="editData.quantity" placeholder="Quantity" />
+      </div>
+      <div class="form-group">
+        <label>Price</label>
+        <input type="number" [(ngModel)]="editData.price" placeholder="Price" />
+      </div>
+      <div class="form-group">
+        <label>Selling Price</label>
+        <input type="number" [(ngModel)]="editData.sellingPrice" placeholder="Selling Price" />
+      </div>
+      <div class="form-group">
+        <label>Cashier</label>
+        <input [(ngModel)]="editData.cashier" placeholder="Cashier Name" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select [(ngModel)]="editData.status">
+          <option value="completed">completed</option>
+          <option value="closed">closed</option>
+          <option value="failed">failed</option>
+          <option value="pending">pending</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button (click)="closeModal()">Cancel</button>
+        <button (click)="saveData()">{{ isEditMode ? 'Save' : 'Create' }}</button>
+      </div>
+    </div>
+  </div>
+</div>
